@@ -17,10 +17,6 @@ public class AWSConfig {
     String secretKey;
     @Bean
     public AmazonTextract amazonTextract() {
-        // Replace these with values from your configuration
-
-
-
 
         BasicAWSCredentials awsCreds = new BasicAWSCredentials(accessKey, secretKey);
 

@@ -1,6 +1,9 @@
 package com.ai.JobRecommendationSystem.service;
 
-import org.apache.kafka.clients.producer.ProducerConfig;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -10,25 +13,38 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.sql.*;
-import java.util.Properties;
+import java.util.*;
 
 @Service
-public class KafkaStreamingService {
+public class JRSStreamService {
+
+    List<Map<String, Object>> resultList = new ArrayList<>();
     @Value("${spring.datasource.url}")
-    private static String connectionURL;
+    private String connectionURL;
 
     @Value("${spring.datasource.username}")
-    private static String dbUsername;
+    private String dbUsername;
 
     @Value("${spring.datasource.password}")
-    private static String dbPassword;
+    private String dbPassword;
 
     @Value("${spring.kafka.topic}")
     private String topic;
 
+    @Value("${spring.kafka.query-topic}")
+    private String queryTopic;
 
+    @Value("${spring.kafka.bootstrap-servers}")
+    private String bootstrapServers;
 
-    public void createKafkaStream(@Value("${spring.kafka.bootstrap-servers}")String bootstrapServers, @Value("${pring.kafka.query-topic}")String queryTopic) {
+    private KafkaStreams streams;
+
+    @PostConstruct
+    public void createKafkaStream() {
+
+        if (queryTopic == null || queryTopic.isBlank()) {
+            throw new IllegalArgumentException("queryTopic is null or empty!");
+        }
         Properties prop = new Properties();
         prop.put(StreamsConfig.APPLICATION_ID_CONFIG, "jrs-application");
         prop.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,bootstrapServers);
@@ -36,8 +52,7 @@ public class KafkaStreamingService {
         prop.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,Serdes.String().getClass());
 
         StreamsBuilder builder = new StreamsBuilder();
-        KafkaStreams streams = new KafkaStreams(builder.build(),prop);
-        streams.start();
+
         KStream<String, String> queries = builder.stream(queryTopic);
         KStream<String,String> results = queries.mapValues(query -> {
             try{
@@ -46,26 +61,38 @@ public class KafkaStreamingService {
                 return "Error"+ e.getMessage();
             }
         });
-
         results.to(topic);
+        streams = new KafkaStreams(builder.build(),prop);
+        streams.start();
 
-        Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (streams != null) streams.close();
+        }));
     }
 
-    private static String executeQuery(String query) throws SQLException {
+    private String executeQuery(String query) throws SQLException, JsonProcessingException {
         StringBuilder result = new StringBuilder();
         try(Connection con = DriverManager.getConnection(connectionURL,dbUsername,dbPassword);
             Statement stmt = con.createStatement();
             ResultSet res = stmt.executeQuery(query)){
             int columnCount = res.getMetaData().getColumnCount();
             while(res.next()){
-                for(int i= 1; i <= columnCount; i++){
-                    result.append(res.getString(i));
+                Map<String, Object> row = new HashMap<>();
+                for(int i = 1; i <= columnCount; i++){
+                    row.put(res.getMetaData().getColumnLabel(i), res.getObject(i));
                 }
-                result.append("\n");
+                resultList.add(row);
             }
         }
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.writeValueAsString(resultList);
+    }
 
-        return result.toString();
+    @PreDestroy
+    public void shutdown() {
+        if (streams != null) {
+            streams.close();
+        }
     }
 }
