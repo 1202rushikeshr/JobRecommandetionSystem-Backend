@@ -43,7 +43,7 @@ pipeline {
                    stage('Build Docker Image') {
                          steps {
                                 script {
-                                            dockerImage = docker.build("${IMAGE_REPO_NAME}:${IMAGE_TAG}", "-f ./JobRecommandetionSystem-Backend/DockerFile .")
+                                            dockerImage = docker.build("${IMAGE_REPO_NAME}:${IMAGE_TAG}", "-f ./JobRecommandetionSystem-Backend/Dockerfile .")
                                         }
                                     }
                                 }
