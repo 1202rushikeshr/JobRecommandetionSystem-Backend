@@ -5,38 +5,37 @@ pipeline {
                AWS_DEFAULT_REGION = 'us-east-1'   // change as needed
                IMAGE_REPO_NAME = 'jobrecommendationsystem'
                IMAGE_TAG = "v1"
-               REPOSITORY_URI= '597088054150.dkr.ecr.us-east-1.amazonaws.com/jobrecommendationsystem'
+               REPOSITORY_URI= "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}"
            }
-
-    stages {
 
             stages {
                     stage('AWS ECR Login') {
                         steps {
                               script {
-//                                     def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
-                                    ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
-
                                     sh """
-                                        echo "Logging into ECR at ${ECR_REGISTRY}..."
-                                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
-                                          docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                                        echo "Logging into ECR ..."
+                                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
                                     """
                                 }
                             }
                         }
-                    }
-                   stage('Cloning Git') {
-                        steps {
-                            checkout([$class:'GitSCM',branches: [[name:'/*main']], doGenerateSubmoduleConfigurations:false,
-                            extensions:[],submoduleCfg:[],userRemoteConfig:[[credentialsId:'',
-                            url:'https://github.com/1202rushikeshr/JobRecommandetionSystem-Backend']]])
-            //                     git url: 'https://github.com/1202rushikeshr/JobRecommandetionSystem-Backend', branches: [[name:'/*main']]
-                            }
-                        }
+
+                    stage('Clone Git Repository') {
+                              steps {
+                                  checkout([
+                                      $class: 'GitSCM',
+                                      branches: [[name: '*/main']],
+                                      userRemoteConfigs: [[
+                                          url: 'https://github.com/1202rushikeshr/JobRecommandetionSystem-Backend',
+                                          credentialsId: '' // ❗ If it's private, add your Git credentials ID here
+                                      ]]
+                                  ])
+                              }
+                          }
 
                    stage('Build Gradle Project') {
                         steps {
+                                sh 'chmod +x gradlew'
                                 sh './gradlew clean build'
                             }
                         }
@@ -44,7 +43,7 @@ pipeline {
                    stage('Build Docker Image') {
                          steps {
                                 script {
-                                            dockerImage = docker.build("${IMAGE_REPO_NAME}:${IMAGE_TAG}")
+                                            dockerImage = docker.build("${IMAGE_REPO_NAME}:${IMAGE_TAG}", "-f ./JobRecommandetionSystem-Backend/DockerFile .")
                                         }
                                     }
                                 }
@@ -57,5 +56,14 @@ pipeline {
                                     }
                                 }
                             }
+                  }
+            post {
+                    success {
+                        echo "✅ Build and ECR push completed."
                     }
-            }
+                    failure {
+                        echo "❌ Pipeline failed. Check the stage logs above."
+                    }
+                 }
+
+        }
