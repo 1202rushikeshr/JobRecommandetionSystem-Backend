@@ -22,6 +22,7 @@ pipeline {
 
                     stage('Clone Git Repository') {
                               steps {
+                              dir('JobRecommandetionSystem-Backend') {
                                   checkout([
                                       $class: 'GitSCM',
                                       branches: [[name: '*/main']],
@@ -30,6 +31,7 @@ pipeline {
                                           credentialsId: '' // ❗ If it's private, add your Git credentials ID here
                                       ]]
                                   ])
+                                  }
                               }
                           }
 
