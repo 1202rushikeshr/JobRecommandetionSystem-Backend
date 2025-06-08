@@ -2,6 +2,8 @@ package com.ai.JobRecommendationSystem.service;
 
 
 import com.ai.JobRecommendationSystem.entity.User;
+import com.ai.JobRecommendationSystem.repository.JRS_RegistrationRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -9,15 +11,22 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
+
 
 @Service
 public class JRSProducerService {
 
+    @Autowired
+    JRS_RegistrationRepository jrsRegistrationRepository;
     private KafkaProducer<String, User> producer;
     private KafkaProducer<String, String> producer1;
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -57,18 +66,28 @@ public class JRSProducerService {
             RecordMetadata metadata = producer.send(record).get();
             System.out.println("Sent to topic:" + metadata.topic()+",partition:"+metadata.partition());
         }catch(ExecutionException | InterruptedException e){
+
             throw new RuntimeException(e);
         }
 
     }
 
-    public void sendQuery(String query){
-        try {
-            ProducerRecord<String, String> record = new ProducerRecord<String, String>(queryTopic, "Get Users with Email", query);
-            RecordMetadata metadata = producer1.send(record).get();
-        }catch(ExecutionException | InterruptedException e){
-            throw new RuntimeException(e);
-        }
+    public void sendQuery(String email){
+           Optional<List<User>> users = jrsRegistrationRepository.findByEmail(email);
+      users.ifPresent(usersRegistered -> {
+          for(User user : usersRegistered){
+              try {
+                  String json = objectMapper.writeValueAsString(user);
+                  ProducerRecord<String, String> record = new ProducerRecord<String, String>(topic, "Get Users with Email", json);
+                  RecordMetadata metadata = producer1.send(record).get();
+              }catch(ExecutionException | InterruptedException e){
+                  throw new RuntimeException(e);
+              } catch (JsonProcessingException e) {
+                  throw new RuntimeException(e);
+              }
+          }
+      });
+
     }
 
     //close kafka-client cleanly

@@ -3,7 +3,6 @@ package com.ai.JobRecommendationSystem.service;
 import com.ai.JobRecommendationSystem.dto.UserRequestDto;
 import com.ai.JobRecommendationSystem.dto.UserResponseDto;
 import com.ai.JobRecommendationSystem.entity.User;
-import com.amazonaws.services.textract.model.DetectDocumentTextResult;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -14,6 +13,6 @@ public interface UserService {
 
     List<UserResponseDto> getUsers(String email);
 
-    DetectDocumentTextResult analyzeDocument(MultipartFile file) throws IOException;
+    String analyzeDocument(MultipartFile file) throws IOException;
 
 }
