@@ -6,6 +6,10 @@ pipeline {
                IMAGE_REPO_NAME = 'jobrecommendationsystem'
                IMAGE_TAG = "v1"
                REPOSITORY_URI= "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}"
+               ECS_CLUSTER         = 'jrs-cluster'
+               ECS_SERVICE         = 'jrs-service'
+               TASK_DEF_FAMILY     = 'jrs-task'
+               CONTAINER_NAME      = 'jrs-container'
            }
 
             stages {
@@ -58,7 +62,38 @@ pipeline {
                                     }
                                 }
                             }
+
+            stage('Register New ECS Task Definition') {
+                                steps {
+                                      script {
+                                                            // Export the current task definition and update the image
+                                          sh """
+                                               aws ecs describe-task-definition --task-definition ${TASK_DEF_FAMILY} \
+                                                --query "taskDefinition" > task-def.json
+
+                                                jq '.containerDefinitions[0].image = "${REPOSITORY_URI}:${IMAGE_TAG}"' task-def.json > new-task-def.json
+                                                jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' new-task-def.json > task-def-register.json
+
+                                                aws ecs register-task-definition --cli-input-json file://task-def-register.json
+                                                """
+                                                 }
+                                      }
+                                }
+
+            stage('Update ECS Service to Deploy Tomcat') {
+                                steps {
+                                       sh """
+                                            aws ecs update-service \
+                                               --cluster ${ECS_CLUSTER} \
+                                                 --service ${ECS_SERVICE} \
+                                                    --force-new-deployment \
+                                                     --region ${AWS_REGION}
+                                                    """
+                                            }
+                                       }
                   }
+
+
 
             post {
                     success {

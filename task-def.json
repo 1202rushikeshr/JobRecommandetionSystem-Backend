@@ -1,0 +1,21 @@
+{
+  "family": "tomcat-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::597088054150:role/JenkinsFullAccessRole",
+  "containerDefinitions": [
+    {
+      "name": "tomcat-container",
+      "image": "597088054150.dkr.ecr.us-east-1.amazonaws.com/jobrecommendationsystem",
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true
+    }
+  ]
+}
